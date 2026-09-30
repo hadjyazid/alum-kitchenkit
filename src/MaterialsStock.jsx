@@ -11,5 +11,62 @@ export default function MaterialsStock(){
  function edit(m){if(!canManageMaterials)return;setEditing(m.id);setForm({...empty,...m,initial_stock:'0'})}
  async function stock(m,type){if(!canManageStock){setError('Vous n’avez pas la permission de gérer le stock.');return}const value=window.prompt(type==='in'?'Quantité à recevoir':'Quantité à sortir','1');if(value===null)return;const qty=Number(value);if(!Number.isFinite(qty)||qty<=0){setError('La quantité doit être supérieure à zéro.');return}setBusy(true);setError('');try{const {data,error}=await supabase.rpc('adjust_material_stock',{p_material_id:m.id,p_quantity:qty,p_movement_type:type,p_reference_type:'manual',p_notes:type==='in'?'Réception manuelle':'Sortie manuelle'});if(error)throw error;setMaterials(xs=>xs.map(x=>x.id===m.id?{...x,stock_quantity:data}:x));setMovement(`${m.name}: ${type==='in'?'+':'−'}${qty} ${m.purchase_unit}`)}catch(e){setError(e.message)}finally{setBusy(false)}}
  if(!canView)return <section className="panel"><h2>Materials & Stock</h2><div className="error">Accès non autorisé à ce module.</div></section>;
- return <section className="materials-page"><div className="panel"><div className="panelhead"><div><h2>Materials & Stock</h2><p>Catalogue de matières et mouvements de stock enregistrés dans Supabase.</p></div></div>{error&&<div className="error">{error}</div>}{movement&&<div className="success">{movement} — mouvement enregistré.</div>}{canManageMaterials&&<form className="material-form" onSubmit={save}><label>Nom *<input required value={form.name} onChange={e=>set('name',e.target.value)} placeholder="1 Départ"/></label><label>Type<select value={form.material_type} onChange={e=>set('material_type',e.target.value)}><option value="profile">Profile</option><option value="sheet">Résine / Aluco</option><option value="accessory">Accessory</option></select></label><label>Unité d'achat<select value={form.purchase_unit} onChange={e=>set('purchase_unit',e.target.value)}><option value="piece">Pièce</option><option value="bar">Barre</option><option value="meter">Mètre</option><option value="sheet">Plaque</option></select></label>{form.material_type==='profile'&&<label>Longueur unité (m)<input type="number" min="0" step="0.001" value={form.purchase_length_m} onChange={e=>set('purchase_length_m',e.target.value)}/></label>}{form.material_type==='sheet'&&<><label>Longueur plaque (m)<input type="number" min="0" step="0.001" value={form.sheet_length_m} onChange={e=>set('sheet_length_m',e.target.value)}/></label><label>Largeur plaque (m)<input type="number" min="0" step="0.001" value={form.sheet_width_m} onChange={e=>set('sheet_width_m',e.target.value)}/></label>}<label>Prix achat<input type="number" min="0" step="0.01" value={form.unit_price} onChange={e=>set('unit_price',e.target.value)}/></label>{!editing&&<label>Stock initial<input type="number" min="0" step="0.001" value={form.initial_stock} onChange={e=>set('initial_stock',e.target.value)}/></label>}<label>Seuil alerte<input type="number" min="0" step="0.001" value={form.low_stock_threshold} onChange={e=>set('low_stock_threshold',e.target.value)}/></label><div className="form-actions"><button className="primary" disabled={busy}>{editing?'Enregistrer':'Ajouter'}</button>{editing&&<button type="button" onClick={()=>{setEditing(null);setForm(empty)}}>Annuler</button>}</div></form>}</div><div className="panel"><div className="panelhead"><div><h3>Catalogue</h3><p>Chaque entrée/sortie crée un mouvement réel.</p></div></div><div className="material-table"><div className="material-head"><span>Material</span><span>Type</span><span>Dimension</span><span>Prix</span><span>Stock</span><span>Actions</span></div>{materials.map(m=><div className="material-row" key={m.id}><b>{m.name}</b><span>{m.material_type}</span><span>{m.material_type==='profile'?`${m.purchase_length_m||0} m`:`${m.sheet_length_m||0} × ${m.sheet_width_m||0} m`}</span><span>{Number(m.unit_price||0).toLocaleString('fr-DZ')} DA</span><span className={Number(m.stock_quantity)<=Number(m.low_stock_threshold)?'stock-low':'stock-ok'}>{m.stock_quantity} {m.purchase_unit}</span><div>{canManageMaterials&&<button onClick={()=>edit(m)}>Modifier</button>}{canManageStock&&<><button disabled={busy} onClick={()=>stock(m,'in')}>+ Stock</button><button disabled={busy} onClick={()=>stock(m,'out')}>− Stock</button></>}</div></div>)}</div></div></section>}
+ return (
+  <section className="materials-page">
+   <div className="panel">
+    <div className="panelhead">
+     <div>
+      <h2>Materials & Stock</h2>
+      <p>Catalogue de matières et mouvements de stock enregistrés dans Supabase.</p>
+     </div>
+    </div>
+    {error && <div className="error">{error}</div>}
+    {movement && <div className="success">{movement} — mouvement enregistré.</div>}
+    {canManageMaterials && (
+     <form className="material-form" onSubmit={save}>
+      <label>Nom *<input required value={form.name} onChange={e=>set('name',e.target.value)} placeholder="1 Départ"/></label>
+      <label>Type<select value={form.material_type} onChange={e=>set('material_type',e.target.value)}><option value="profile">Profile</option><option value="sheet">Résine / Aluco</option><option value="accessory">Accessory</option></select></label>
+      <label>Unité d'achat<select value={form.purchase_unit} onChange={e=>set('purchase_unit',e.target.value)}><option value="piece">Pièce</option><option value="bar">Barre</option><option value="meter">Mètre</option><option value="sheet">Plaque</option></select></label>
+      {form.material_type==='profile' && <label>Longueur unité (m)<input type="number" min="0" step="0.001" value={form.purchase_length_m} onChange={e=>set('purchase_length_m',e.target.value)}/></label>}
+      {form.material_type==='sheet' && <>
+       <label>Longueur plaque (m)<input type="number" min="0" step="0.001" value={form.sheet_length_m} onChange={e=>set('sheet_length_m',e.target.value)}/></label>
+       <label>Largeur plaque (m)<input type="number" min="0" step="0.001" value={form.sheet_width_m} onChange={e=>set('sheet_width_m',e.target.value)}/></label>
+      </>}
+      <label>Prix achat<input type="number" min="0" step="0.01" value={form.unit_price} onChange={e=>set('unit_price',e.target.value)}/></label>
+      {!editing && <label>Stock initial<input type="number" min="0" step="0.001" value={form.initial_stock} onChange={e=>set('initial_stock',e.target.value)}/></label>}
+      <label>Seuil alerte<input type="number" min="0" step="0.001" value={form.low_stock_threshold} onChange={e=>set('low_stock_threshold',e.target.value)}/></label>
+      <div className="form-actions">
+       <button className="primary" disabled={busy}>{editing ? 'Enregistrer' : 'Ajouter'}</button>
+       {editing && <button type="button" onClick={()=>{setEditing(null);setForm(empty)}}>Annuler</button>}
+      </div>
+     </form>
+    )}
+   </div>
+   <div className="panel">
+    <div className="panelhead">
+     <div><h3>Catalogue</h3><p>Chaque entrée/sortie crée un mouvement réel.</p></div>
+    </div>
+    <div className="material-table">
+     <div className="material-head"><span>Material</span><span>Type</span><span>Dimension</span><span>Prix</span><span>Stock</span><span>Actions</span></div>
+     {materials.map(m => (
+      <div className="material-row" key={m.id}>
+       <b>{m.name}</b>
+       <span>{m.material_type}</span>
+       <span>{m.material_type==='profile' ? `${m.purchase_length_m||0} m` : `${m.sheet_length_m||0} × ${m.sheet_width_m||0} m`}</span>
+       <span>{Number(m.unit_price||0).toLocaleString('fr-DZ')} DA</span>
+       <span className={Number(m.stock_quantity)<=Number(m.low_stock_threshold) ? 'stock-low' : 'stock-ok'}>{m.stock_quantity} {m.purchase_unit}</span>
+       <div>
+        {canManageMaterials && <button onClick={()=>edit(m)}>Modifier</button>}
+        {canManageStock && <>
+         <button disabled={busy} onClick={()=>stock(m,'in')}>+ Stock</button>
+         <button disabled={busy} onClick={()=>stock(m,'out')}>− Stock</button>
+        </>}
+       </div>
+      </div>
+     ))}
+    </div>
+   </div>
+  </section>
+ )
+}
 function num(v){return v===''||v==null?null:Number(v)}
