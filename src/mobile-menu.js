@@ -9,16 +9,27 @@ function ensureStyles() {
     @media (max-width: 767px) {
       .simplified-app > aside { display: none !important; }
       .simplified-app > main { padding-bottom: 1rem !important; }
-      .simplified-app > main > header { padding-inline-start: 3.5rem; }
+      .simplified-app > main > header {
+        padding-inline: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: .75rem !important;
+      }
+      .ak-mobile-topbar {
+        width: 100%;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: .625rem;
+      }
       .ak-mobile-trigger {
-        position: fixed;
-        inset-block-start: max(.75rem, env(safe-area-inset-top));
-        inset-inline-start: .75rem;
-        z-index: 120;
-        width: 2.75rem;
-        height: 2.75rem;
+        position: static;
+        flex: 0 0 3.25rem;
+        width: 3.25rem;
+        height: 3.25rem;
         border: 1px solid var(--color-border);
-        border-radius: .75rem;
+        border-radius: .85rem;
         background: var(--color-surface);
         color: var(--color-text-primary);
         display: inline-flex;
@@ -28,6 +39,28 @@ function ensureStyles() {
         cursor: pointer;
       }
       .ak-mobile-trigger svg { width: 20px; height: 20px; }
+      .ak-mobile-topbar .theme-switcher {
+        flex: 1 1 auto;
+        width: auto !important;
+        min-width: 0;
+        flex-wrap: nowrap;
+        gap: .5rem;
+      }
+      .ak-mobile-topbar .theme-mode-btn,
+      .ak-mobile-topbar .theme-color-select {
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto;
+        padding-inline: .65rem;
+        white-space: nowrap;
+      }
+      .ak-mobile-topbar .theme-color-select select {
+        min-width: 0;
+        max-width: 100%;
+      }
+      .ak-mobile-page-heading { min-width: 0; }
+      .ak-mobile-page-heading h1,
+      .ak-mobile-page-heading p { margin-inline-start: 0 !important; }
       .ak-mobile-overlay {
         position: fixed;
         inset: 0;
@@ -73,6 +106,12 @@ function ensureStyles() {
       .ak-mobile-logout:hover,.ak-mobile-nav button:hover { background:var(--color-surface-subtle); }
       body.ak-mobile-menu-open { overflow:hidden; }
     }
+    @media (max-width: 380px) {
+      .ak-mobile-topbar { gap: .45rem; }
+      .ak-mobile-trigger { flex-basis: 2.9rem; width: 2.9rem; height: 2.9rem; }
+      .ak-mobile-topbar .theme-mode-btn,
+      .ak-mobile-topbar .theme-color-select { padding-inline: .45rem; font-size: .78rem; }
+    }
     @media (min-width: 768px) {
       .ak-mobile-trigger,.ak-mobile-overlay,.ak-mobile-drawer { display:none !important; }
     }
@@ -117,6 +156,16 @@ function buildMenu() {
   if (!app || !header || !aside) return;
   ensureStyles();
 
+  let topbar = header.querySelector('.ak-mobile-topbar');
+  if (!topbar) {
+    topbar = document.createElement('div');
+    topbar.className = 'ak-mobile-topbar';
+    header.insertBefore(topbar, header.firstChild);
+  }
+
+  const heading = header.querySelector(':scope > div:not(.ak-mobile-topbar)');
+  if (heading) heading.classList.add('ak-mobile-page-heading');
+
   let trigger = document.querySelector(`[${TRIGGER_ATTR}]`);
   if (!trigger) {
     trigger = document.createElement('button');
@@ -130,8 +179,11 @@ function buildMenu() {
       document.querySelector('.ak-mobile-drawer')?.classList.add('open');
       document.body.classList.add('ak-mobile-menu-open');
     });
-    document.body.appendChild(trigger);
   }
+  if (trigger.parentElement !== topbar) topbar.prepend(trigger);
+
+  const themeSwitcher = header.querySelector('.theme-switcher');
+  if (themeSwitcher && themeSwitcher.parentElement !== topbar) topbar.appendChild(themeSwitcher);
 
   let overlay = document.querySelector('.ak-mobile-overlay');
   let drawer = document.querySelector('.ak-mobile-drawer');
