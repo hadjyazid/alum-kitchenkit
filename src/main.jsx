@@ -2,6 +2,7 @@ import React,{useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {LayoutDashboard,Plus,LogOut,FileText,ArrowLeft} from 'lucide-react';
 import './styles.css';
+import './design-system.css';
 import Workspace from './Workspace';
 import UserManagement from './UserManagement';
 import {supabase} from './supabase';
