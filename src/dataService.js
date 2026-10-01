@@ -28,6 +28,12 @@ export async function updateKitchen(kitchenId,input){
   const {data,error}=await supabase.from('kitchens').update(input).eq('id',kitchenId).select().single();
   if(error) throw error; return data;
 }
+export async function deleteKitchen(kitchenId){
+  const {error:boxesError}=await supabase.from('boxes').delete().eq('kitchen_id',kitchenId);
+  if(boxesError) throw boxesError;
+  const {error:kitchenError}=await supabase.from('kitchens').delete().eq('id',kitchenId);
+  if(kitchenError) throw kitchenError;
+}
 export async function createBox(input){
   const {data,error}=await supabase.from('boxes').insert(input).select().single();
   if(error) throw error; return data;
