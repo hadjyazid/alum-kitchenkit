@@ -4,12 +4,28 @@ export async function listCustomers(companyId){
   const {data,error}=await supabase.from('customers').select('*').eq('company_id',companyId).order('created_at',{ascending:false});
   if(error) throw error; return data;
 }
+export async function getCustomer(customerId){
+  const {data,error}=await supabase.from('customers').select('*').eq('id',customerId).single();
+  if(error) throw error; return data;
+}
 export async function createCustomer(input){
   const {data,error}=await supabase.from('customers').insert(input).select().single();
   if(error) throw error; return data;
 }
 export async function createKitchen(input){
   const {data,error}=await supabase.from('kitchens').insert(input).select().single();
+  if(error) throw error; return data;
+}
+export async function getKitchen(kitchenId){
+  const {data,error}=await supabase.from('kitchens').select('*').eq('id',kitchenId).single();
+  if(error) throw error; return data;
+}
+export async function listKitchens(companyId){
+  const {data,error}=await supabase.from('kitchens').select('*,customers(name,phone)').eq('company_id',companyId).order('updated_at',{ascending:false});
+  if(error) throw error; return data;
+}
+export async function updateKitchen(kitchenId,input){
+  const {data,error}=await supabase.from('kitchens').update(input).eq('id',kitchenId).select().single();
   if(error) throw error; return data;
 }
 export async function createBox(input){
