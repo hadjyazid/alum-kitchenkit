@@ -1,5 +1,4 @@
 const STYLE_ID = 'ak-mobile-menu-styles';
-const DRAWER_ID = 'ak-mobile-drawer';
 const TRIGGER_ATTR = 'data-mobile-menu-trigger';
 
 function ensureStyles() {
@@ -9,6 +8,8 @@ function ensureStyles() {
   style.textContent = `
     @media (max-width: 767px) {
       .simplified-app > aside { display: none !important; }
+      .simplified-app > main { padding-bottom: 1rem !important; }
+      .simplified-app > main > header { padding-inline-start: 3.5rem; }
       .ak-mobile-trigger {
         position: fixed;
         inset-block-start: max(.75rem, env(safe-area-inset-top));
@@ -116,7 +117,7 @@ function buildMenu() {
   if (!app || !header || !aside) return;
   ensureStyles();
 
-  let trigger = header.querySelector(`[${TRIGGER_ATTR}]`);
+  let trigger = document.querySelector(`[${TRIGGER_ATTR}]`);
   if (!trigger) {
     trigger = document.createElement('button');
     trigger.type = 'button';
@@ -160,7 +161,7 @@ function buildMenu() {
 
     const nav = document.createElement('nav');
     nav.className = 'ak-mobile-nav';
-    [...aside.querySelectorAll('nav button')].forEach((original, index) => {
+    [...aside.querySelectorAll('nav button')].forEach(original => {
       const button = original.cloneNode(true);
       button.type = 'button';
       button.addEventListener('click', () => {
