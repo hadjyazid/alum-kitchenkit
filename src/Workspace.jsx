@@ -52,128 +52,21 @@ function BoxResults({data:d}){return <div className="box-results"><div className
 function ProjectSummary({boxes,draftBox}){
   const summary=useMemo(()=>{
     const all=[...(boxes||[])];
-    if(draftBox) all.push({
-      length_mm:n(draftBox.length)*10,
-      height_mm:n(draftBox.height)*10,
-      depth_mm:n(draftBox.depth)*10,
-      number_of_doors:n(draftBox.doors),
-      number_of_shelves:n(draftBox.shelves),
-      box_type:draftBox.boxType,
-      structure:draftBox.structure
-    });
-
+    if(draftBox) all.push({length_mm:n(draftBox.length)*10,height_mm:n(draftBox.height)*10,depth_mm:n(draftBox.depth)*10,number_of_doors:n(draftBox.doors),number_of_shelves:n(draftBox.shelves),box_type:draftBox.boxType,structure:draftBox.structure});
     const profiles=new Map();
     const resinPieces=new Map();
-    let boxCoins=0, shelfCoins=0, doorAngles=0, handles=0, legs=0, ouvrantLength=0, ouvrantQty=0;
-
+    const alucoPieces=new Map();
+    let boxCoins=0,shelfCoins=0,doorAngles=0,handles=0,legs=0,ouvrantLength=0,ouvrantQty=0;
     for(const b of all){
-      const d=calcBox({
-        length:n(b.length_mm)/10,
-        height:n(b.height_mm)/10,
-        depth:n(b.depth_mm)/10,
-        doors:n(b.number_of_doors),
-        shelves:n(b.number_of_shelves),
-        boxType:b.box_type,
-        structure:b.structure
-      });
-
-      d.profiles.forEach(([name,qty,len])=>{
-        const x=profiles.get(name)||{qty:0,length:0};
-        x.qty+=n(qty);
-        x.length+=n(qty)*n(len);
-        profiles.set(name,x);
-      });
-
+      const d=calcBox({length:n(b.length_mm)/10,height:n(b.height_mm)/10,depth:n(b.depth_mm)/10,doors:n(b.number_of_doors),shelves:n(b.number_of_shelves),boxType:b.box_type,structure:b.structure});
+      d.profiles.forEach(([name,qty,len])=>{const x=profiles.get(name)||{qty:0,length:0};x.qty+=n(qty);x.length+=n(qty)*n(len);profiles.set(name,x)});
       const boxNo=formatBoxNo(all.indexOf(b)+1);
-      d.resin.forEach(([,w,h])=>{
-        const width=Math.max(0,n(w));
-        const height=Math.max(0,n(h));
-        const key=`${boxNo}|${width.toFixed(1)}|${height.toFixed(1)}`;
-        const x=resinPieces.get(key)||{box:boxNo,width,height,qty:0};
-        x.qty+=1;
-        resinPieces.set(key,x);
-      });
-
-      // Les étagères utilisent aussi du 1 Départ : 2 pièces en longueur + 2 pièces en profondeur par étagère.
-      if(d.shelves.count>0){
-        const x=profiles.get('1 Départ')||{qty:0,length:0};
-        const shelfQty=n(d.shelves.count)*4;
-        const shelfLength=n(d.shelves.count)*2*(n(d.shelves.length)+n(d.shelves.depth));
-        x.qty+=shelfQty;
-        x.length+=shelfLength;
-        profiles.set('1 Départ',x);
-      }
-
-      if(d.doors.count>0){
-        ouvrantQty+=d.doors.count;
-        ouvrantLength += d.doors.count * (2*n(d.doors.width)+2*n(d.doors.height));
-      }
-
-      boxCoins+=n(d.accessories.boxCoins);
-      shelfCoins+=n(d.shelves.coins);
-      doorAngles+=n(d.doors.coins);
-      handles+=n(d.doors.handles);
-      legs+=n(d.accessories.legs);
+      d.resin.forEach(([,w,h])=>{const width=Math.max(0,n(w));const height=Math.max(0,n(h));const key=`${boxNo}|${width.toFixed(1)}|${height.toFixed(1)}`;const x=resinPieces.get(key)||{box:boxNo,width,height,qty:0};x.qty+=1;resinPieces.set(key,x)});
+      if(d.shelves.count>0){const x=profiles.get('1 Départ')||{qty:0,length:0};const shelfQty=n(d.shelves.count)*4;const shelfLength=n(d.shelves.count)*2*(n(d.shelves.length)+n(d.shelves.depth));x.qty+=shelfQty;x.length+=shelfLength;profiles.set('1 Départ',x)}
+      if(d.doors.count>0){ouvrantQty+=d.doors.count;ouvrantLength+=d.doors.count*(2*n(d.doors.width)+2*n(d.doors.height));const width=Math.max(0,n(d.doors.alucoW));const height=Math.max(0,n(d.doors.alucoH));const key=`${boxNo}|${width.toFixed(1)}|${height.toFixed(1)}`;const x=alucoPieces.get(key)||{box:boxNo,width,height,qty:0};x.qty+=d.doors.count;alucoPieces.set(key,x)}
+      boxCoins+=n(d.accessories.boxCoins);shelfCoins+=n(d.shelves.coins);doorAngles+=n(d.doors.coins);handles+=n(d.doors.handles);legs+=n(d.accessories.legs);
     }
-
-    return {
-      boxCount:all.length,
-      profiles:[...profiles.entries()],
-      resin:[...resinPieces.values()].map((r,i)=>({...r,number:i+1})),
-      ouvrant:{qty:ouvrantQty,length:ouvrantLength},
-      accessories:{boxCoins,shelfCoins,doorAngles,handles,legs}
-    };
+    return {boxCount:all.length,profiles:[...profiles.entries()],resin:[...resinPieces.values()].map((r,i)=>({...r,number:i+1})),aluco:[...alucoPieces.values()].map((r,i)=>({...r,number:i+1})),ouvrant:{qty:ouvrantQty,length:ouvrantLength},accessories:{boxCoins,shelfCoins,doorAngles,handles,legs}};
   },[boxes,draftBox]);
-
-  return <section className="panel project-summary">
-    <div className="summary-head">
-      <div>
-        <h3>Résumé du projet</h3>
-        <p>Total des matériaux calculés pour {summary.boxCount} boîte{summary.boxCount>1?'s':''}{draftBox?' (aperçu en cours de saisie)':''}.</p>
-      </div>
-    </div>
-
-    <div className="summary-sections" style={{display:'flex',flexDirection:'column',gap:'14px'}}>
-      <div className="summary-block">
-        <h4>Profiles</h4>
-        <table>
-          <thead><tr><th>Profile</th><th>Longueur totale</th></tr></thead>
-          <tbody>
-            {summary.profiles.map(([name,v])=>
-              <tr key={name}><td>{name}</td><td>{v.length.toFixed(1)} cm</td></tr>
-            )}
-            <tr><td>OUVRANT</td><td>{summary.ouvrant.length.toFixed(1)} cm</td></tr>
-            {!summary.profiles.length&&summary.ouvrant.qty===0&&<tr><td colSpan="2">Aucun matériau calculé.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="summary-block">
-        <h4>Résine</h4>
-        <table>
-          <thead><tr><th>N° pièce</th><th>Boîte</th><th>Dimensions</th><th>Qté</th><th>Matière</th></tr></thead>
-          <tbody>
-            {summary.resin.map(r=>
-              <tr key={`${r.box}-${r.width}-${r.height}`}><td>{r.number}</td><td>{r.box}</td><td>{r.width.toFixed(1)} × {r.height.toFixed(1)} cm</td><td>{r.qty}</td><td>Résine</td></tr>
-            )}
-            {!summary.resin.length&&<tr><td colSpan="5">Aucune pièce de résine calculée.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="summary-block">
-        <h4>Accessoires</h4>
-        <table>
-          <thead><tr><th>Accessoire</th><th>Qté</th></tr></thead>
-          <tbody>
-            <tr><td>Coin 3 Départes</td><td>{summary.accessories.boxCoins}</td></tr>
-            <tr><td>Coin 2 Départes</td><td>{summary.accessories.shelfCoins}</td></tr>
-            <tr><td>équerre</td><td>{summary.accessories.doorAngles}</td></tr>
-            <tr><td>Poignée</td><td>{summary.accessories.handles}</td></tr>
-            <tr><td>Pieds</td><td>{summary.accessories.legs}</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+  return <section className="panel project-summary"><div className="summary-head"><div><h3>Résumé du projet</h3><p>Total des matériaux calculés pour {summary.boxCount} boîte{summary.boxCount>1?'s':''}{draftBox?' (aperçu en cours de saisie)':''}.</p></div></div><div className="summary-sections" style={{display:'flex',flexDirection:'column',gap:'14px'}}><div className="summary-block"><h4>Profiles</h4><table><thead><tr><th>Profile</th><th>Longueur totale</th></tr></thead><tbody>{summary.profiles.map(([name,v])=><tr key={name}><td>{name}</td><td>{v.length.toFixed(1)} cm</td></tr>)}<tr><td>OUVRANT</td><td>{summary.ouvrant.length.toFixed(1)} cm</td></tr>{!summary.profiles.length&&summary.ouvrant.qty===0&&<tr><td colSpan="2">Aucun matériau calculé.</td></tr>}</tbody></table></div><div className="summary-block"><h4>Résine</h4><table><thead><tr><th>N° pièce</th><th>Boîte</th><th>Dimensions</th><th>Qté</th><th>Matière</th></tr></thead><tbody>{summary.resin.map(r=><tr key={`${r.box}-${r.width}-${r.height}`}><td>{r.number}</td><td>{r.box}</td><td>{r.width.toFixed(1)} × {r.height.toFixed(1)} cm</td><td>{r.qty}</td><td>Résine</td></tr>)}{!summary.resin.length&&<tr><td colSpan="5">Aucune pièce de résine calculée.</td></tr>}</tbody></table></div><div className="summary-block"><h4>Aluco</h4><table><thead><tr><th>N° pièce</th><th>Boîte</th><th>Dimensions</th><th>Qté</th><th>Matière</th></tr></thead><tbody>{summary.aluco.map(r=><tr key={`${r.box}-${r.width}-${r.height}`}><td>{r.number}</td><td>{r.box}</td><td>{r.width.toFixed(1)} × {r.height.toFixed(1)} cm</td><td>{r.qty}</td><td>Aluco</td></tr>)}{!summary.aluco.length&&<tr><td colSpan="5">Aucune pièce d'Aluco calculée.</td></tr>}</tbody></table></div><div className="summary-block"><h4>Accessoires</h4><table><thead><tr><th>Accessoire</th><th>Qté</th></tr></thead><tbody><tr><td>Coin 3 Départes</td><td>{summary.accessories.boxCoins}</td></tr><tr><td>Coin 2 Départes</td><td>{summary.accessories.shelfCoins}</td></tr><tr><td>équerre</td><td>{summary.accessories.doorAngles}</td></tr><tr><td>Poignée</td><td>{summary.accessories.handles}</td></tr><tr><td>Pieds</td><td>{summary.accessories.legs}</td></tr></tbody></table></div></div></section>
 }
