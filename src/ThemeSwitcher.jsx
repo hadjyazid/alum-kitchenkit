@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react';
 import {Moon,Sun,Palette} from 'lucide-react';
 import {COLOR_THEMES,applyTheme,getStoredTheme,saveTheme} from './theme';
+import './theme-switcher.css';
 
 const labels={blue:'Blue',indigo:'Indigo',emerald:'Emerald',violet:'Violet',orange:'Orange',rose:'Rose'};
 
