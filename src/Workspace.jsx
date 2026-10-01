@@ -50,6 +50,104 @@ export default function Workspace({onBack,initialKitchenId}){
 function SavedBox({box,index,onDelete,deleting}){const d=calcBox({length:box.length_mm/10,height:box.height_mm/10,depth:box.depth_mm/10,doors:box.number_of_doors,shelves:box.number_of_shelves,boxType:box.box_type,structure:box.structure});const number=index+1;return <section className="panel saved-box"><div className="saved-title"><div><h3>Boîte {formatBoxNo(number)}</h3><span>{box.length_mm/10} × {box.height_mm/10} × {box.depth_mm/10} cm</span></div><div className="saved-actions"><span className="badge">Enregistrée</span><button className="danger" type="button" disabled={deleting} onClick={()=>onDelete(box.id)}>{deleting?'Suppression…':'Supprimer'}</button></div></div><BoxResults data={d}/></section>}
 function BoxResults({data:d}){return <div className="box-results"><div className="result-block"><h4>Structure</h4><table><tbody><tr><th>Type</th><td>{d.boxType==='potager'?'Potager':'Élément suspendu'}</td></tr><tr><th>Structure</th><td>{d.structure}</td></tr></tbody></table></div><div className="result-block"><h4>Profiles — corps</h4><table><thead><tr><th>Profile</th><th>Qté</th><th>Longueur</th></tr></thead><tbody>{d.profiles.map((r,i)=><tr key={i}><td>{r[0]}</td><td>{r[1]}</td><td>{r[2].toFixed(1)} cm</td></tr>)}</tbody></table></div><div className="result-block"><h4>Résine — corps</h4><table><thead><tr><th>Face</th><th>Largeur</th><th>Hauteur</th></tr></thead><tbody>{d.resin.map((r,i)=><tr key={i}><td>{r[0]}</td><td>{r[1].toFixed(1)} cm</td><td>{r[2].toFixed(1)} cm</td></tr>)}</tbody></table></div><div className="result-block"><h4>Portes</h4><table><tbody><tr><th>Nombre</th><td>{d.doors.count}</td></tr><tr><th>Largeur / porte</th><td>{d.doors.width.toFixed(1)} cm</td></tr><tr><th>Hauteur</th><td>{d.doors.height.toFixed(1)} cm</td></tr><tr><th>Aluco / porte</th><td>{Math.max(0,d.doors.alucoW).toFixed(1)} × {Math.max(0,d.doors.alucoH).toFixed(1)} cm</td></tr><tr><th>Profile horizontal</th><td>{d.doors.profileHorizontal}</td></tr><tr><th>Profile vertical</th><td>{d.doors.profileVertical}</td></tr><tr><th>équerre</th><td>{d.doors.coins}</td></tr><tr><th>Poignée</th><td>{d.doors.handles}</td></tr></tbody></table></div><div className="result-block"><h4>Étagères</h4><table><tbody><tr><th>Nombre</th><td>{d.shelves.count}</td></tr><tr><th>1 Départ — longueur</th><td>{Math.max(0,d.shelves.length).toFixed(1)} cm × 2 / étagère</td></tr><tr><th>1 Départ — profondeur</th><td>{Math.max(0,d.shelves.depth).toFixed(1)} cm × 2 / étagère</td></tr><tr><th>Résine / étagère</th><td>{Math.max(0,d.shelves.resinW).toFixed(1)} × {Math.max(0,d.shelves.resinD).toFixed(1)} cm</td></tr><tr><th>Coin 2 Départes</th><td>{d.shelves.coins}</td></tr></tbody></table></div><div className="result-block"><h4>Accessoires — Boîte</h4><table><tbody><tr><th>Coin 3 Départes</th><td>{d.accessories.boxCoins}</td></tr>{d.accessories.legs>0&&<tr><th>Pieds</th><td>{d.accessories.legs}</td></tr>}</tbody></table></div></div>}
 function ProjectSummary({boxes,draftBox}){
- const summary=useMemo(()=>{const all=[...(boxes||[])];if(draftBox)all.push({length_mm:n(draftBox.length)*10,height_mm:n(draftBox.height)*10,depth_mm:n(draftBox.depth)*10,number_of_doors:n(draftBox.doors),number_of_shelves:n(draftBox.shelves),box_type:draftBox.boxType,structure:draftBox.structure});const profiles=new Map();let boxCoins=0,doorAngles=0,handles=0,shelfCoins=0,legs=0,ouvrantLength=0,ouvrantQty=0;for(const b of all){const d=calcBox({length:n(b.length_mm)/10,height:n(b.height_mm)/10,depth:n(b.depth_mm)/10,doors:n(b.number_of_doors),shelves:n(b.number_of_shelves),boxType:b.box_type,structure:b.structure});d.profiles.forEach(([name,qty,len])=>{const x=profiles.get(name)||{qty:0,length:0};x.qty+=n(qty);x.length+=n(qty)*n(len);profiles.set(name,x)});if(d.doors.count>0){ouvrantQty+=d.doors.count;ouvrantLength+=d.doors.count*(2*n(d.doors.width)+2*n(d.doors.height))}boxCoins+=n(d.accessories.boxCoins);doorAngles+=n(d.doors.coins);handles+=n(d.doors.handles);shelfCoins+=n(d.shelves.coins);legs+=n(d.accessories.legs)}return {boxCount:all.length,profiles:[...profiles.entries()],ouvrant:{qty:ouvrantQty,length:ouvrantLength},accessories:{boxCoins,shelfCoins,doorAngles,handles,legs}}},[boxes,draftBox]);
- return <section className="panel project-summary"><div className="summary-head"><div><h3>Résumé du projet</h3><p>Total des matériaux calculés pour {summary.boxCount} boîte{summary.boxCount>1?'s':''}{draftBox?' (aperçu en cours de saisie)':''}.</p></div></div><div className="summary-grid" style={{display:'flex',flexDirection:'row',gap:'14px',alignItems:'stretch',overflowX:'auto'}}><div className="summary-block" style={{flex:'1 1 0',minWidth:'320px'}}><h4>Profiles</h4><table><thead><tr><th>Profile</th><th>Longueur totale</th></tr></thead><tbody>{summary.profiles.map(([name,v])=><tr key={name}><td>{name}</td><td>{v.length.toFixed(1)} cm</td></tr>)}<tr><td>OUVRANT</td><td>{summary.ouvrant.length.toFixed(1)} cm</td></tr>{!summary.profiles.length&&summary.ouvrant.qty===0&&<tr><td colSpan="2">Aucun matériau calculé.</td></tr>}</tbody></table></div><div className="summary-block" style={{flex:'1 1 0',minWidth:'320px'}}><h4>Accessoires</h4><table><tbody><tr><th>Coin 3 Départes</th><td>{summary.accessories.boxCoins}</td></tr><tr><th>Coin 2 Départes</th><td>{summary.accessories.shelfCoins}</td></tr><tr><th>équerre</th><td>{summary.accessories.doorAngles}</td></tr><tr><th>Poignée</th><td>{summary.accessories.handles}</td></tr><tr><th>Pieds</th><td>{summary.accessories.legs}</td></tr></tbody></table></div></div></section>
+  const summary=useMemo(()=>{
+    const all=[...(boxes||[])];
+    if(draftBox) all.push({
+      length_mm:n(draftBox.length)*10,
+      height_mm:n(draftBox.height)*10,
+      depth_mm:n(draftBox.depth)*10,
+      number_of_doors:n(draftBox.doors),
+      number_of_shelves:n(draftBox.shelves),
+      box_type:draftBox.boxType,
+      structure:draftBox.structure
+    });
+
+    const profiles=new Map();
+    let boxCoins=0, shelfCoins=0, doorAngles=0, handles=0, legs=0, ouvrantLength=0, ouvrantQty=0;
+
+    for(const b of all){
+      const d=calcBox({
+        length:n(b.length_mm)/10,
+        height:n(b.height_mm)/10,
+        depth:n(b.depth_mm)/10,
+        doors:n(b.number_of_doors),
+        shelves:n(b.number_of_shelves),
+        boxType:b.box_type,
+        structure:b.structure
+      });
+
+      d.profiles.forEach(([name,qty,len])=>{
+        const x=profiles.get(name)||{qty:0,length:0};
+        x.qty+=n(qty);
+        x.length+=n(qty)*n(len);
+        profiles.set(name,x);
+      });
+
+      if(d.shelves.count>0){
+        const x=profiles.get('1 Départ')||{qty:0,length:0};
+        const shelfQty=n(d.shelves.count)*4;
+        const shelfLength=n(d.shelves.count)*2*(n(d.shelves.length)+n(d.shelves.depth));
+        x.qty+=shelfQty;
+        x.length+=shelfLength;
+        profiles.set('1 Départ',x);
+      }
+
+      if(d.doors.count>0){
+        ouvrantQty+=d.doors.count;
+        ouvrantLength += d.doors.count * (2*n(d.doors.width)+2*n(d.doors.height));
+      }
+
+      boxCoins+=n(d.accessories.boxCoins);
+      shelfCoins+=n(d.shelves.coins);
+      doorAngles+=n(d.doors.coins);
+      handles+=n(d.doors.handles);
+      legs+=n(d.accessories.legs);
+    }
+
+    return {
+      boxCount:all.length,
+      profiles:[...profiles.entries()],
+      ouvrant:{qty:ouvrantQty,length:ouvrantLength},
+      accessories:{boxCoins,shelfCoins,doorAngles,handles,legs}
+    };
+  },[boxes,draftBox]);
+
+  return <section className="panel project-summary">
+    <div className="summary-head">
+      <div>
+        <h3>Résumé du projet</h3>
+        <p>Total des matériaux calculés pour {summary.boxCount} boîte{summary.boxCount>1?'s':''}{draftBox?' (aperçu en cours de saisie)':''}.</p>
+      </div>
+    </div>
+
+    <div className="summary-sections" style={{display:'flex',flexDirection:'column',gap:'14px'}}>
+      <div className="summary-block">
+        <h4>Profiles</h4>
+        <table>
+          <thead><tr><th>Profile</th><th>Longueur totale</th></tr></thead>
+          <tbody>
+            {summary.profiles.map(([name,v])=>
+              <tr key={name}><td>{name}</td><td>{v.length.toFixed(1)} cm</td></tr>
+            )}
+            <tr><td>OUVRANT</td><td>{summary.ouvrant.length.toFixed(1)} cm</td></tr>
+            {!summary.profiles.length&&summary.ouvrant.qty===0&&<tr><td colSpan="2">Aucun matériau calculé.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="summary-block">
+        <h4>Accessoires</h4>
+        <table>
+          <thead><tr><th>Accessoire</th><th>Qté</th></tr></thead>
+          <tbody>
+            <tr><td>Coin 3 Départes</td><td>{summary.accessories.boxCoins}</td></tr>
+            <tr><td>Coin 2 Départes</td><td>{summary.accessories.shelfCoins}</td></tr>
+            <tr><td>équerre</td><td>{summary.accessories.doorAngles}</td></tr>
+            <tr><td>Poignée</td><td>{summary.accessories.handles}</td></tr>
+            <tr><td>Pieds</td><td>{summary.accessories.legs}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 }
