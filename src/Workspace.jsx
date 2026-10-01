@@ -63,6 +63,7 @@ function ProjectSummary({boxes,draftBox}){
     });
 
     const profiles=new Map();
+    const resinPieces=new Map();
     let boxCoins=0, shelfCoins=0, doorAngles=0, handles=0, legs=0, ouvrantLength=0, ouvrantQty=0;
 
     for(const b of all){
@@ -83,6 +84,17 @@ function ProjectSummary({boxes,draftBox}){
         profiles.set(name,x);
       });
 
+      const boxNo=formatBoxNo(all.indexOf(b)+1);
+      d.resin.forEach(([,w,h])=>{
+        const width=Math.max(0,n(w));
+        const height=Math.max(0,n(h));
+        const key=`${boxNo}|${width.toFixed(1)}|${height.toFixed(1)}`;
+        const x=resinPieces.get(key)||{box:boxNo,width,height,qty:0};
+        x.qty+=1;
+        resinPieces.set(key,x);
+      });
+
+      // Les étagères utilisent aussi du 1 Départ : 2 pièces en longueur + 2 pièces en profondeur par étagère.
       if(d.shelves.count>0){
         const x=profiles.get('1 Départ')||{qty:0,length:0};
         const shelfQty=n(d.shelves.count)*4;
@@ -107,6 +119,7 @@ function ProjectSummary({boxes,draftBox}){
     return {
       boxCount:all.length,
       profiles:[...profiles.entries()],
+      resin:[...resinPieces.values()].map((r,i)=>({...r,number:i+1})),
       ouvrant:{qty:ouvrantQty,length:ouvrantLength},
       accessories:{boxCoins,shelfCoins,doorAngles,handles,legs}
     };
@@ -131,6 +144,19 @@ function ProjectSummary({boxes,draftBox}){
             )}
             <tr><td>OUVRANT</td><td>{summary.ouvrant.length.toFixed(1)} cm</td></tr>
             {!summary.profiles.length&&summary.ouvrant.qty===0&&<tr><td colSpan="2">Aucun matériau calculé.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="summary-block">
+        <h4>Résine</h4>
+        <table>
+          <thead><tr><th>N° pièce</th><th>Boîte</th><th>Dimensions</th><th>Qté</th><th>Matière</th></tr></thead>
+          <tbody>
+            {summary.resin.map(r=>
+              <tr key={`${r.box}-${r.width}-${r.height}`}><td>{r.number}</td><td>{r.box}</td><td>{r.width.toFixed(1)} × {r.height.toFixed(1)} cm</td><td>{r.qty}</td><td>Résine</td></tr>
+            )}
+            {!summary.resin.length&&<tr><td colSpan="5">Aucune pièce de résine calculée.</td></tr>}
           </tbody>
         </table>
       </div>
