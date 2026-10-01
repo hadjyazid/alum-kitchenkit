@@ -1,29 +1,322 @@
-import React,{useEffect,useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {LayoutDashboard,Plus,LogOut,FileText,ArrowLeft} from 'lucide-react';
+import {LayoutDashboard, Plus, LogOut, FileText, ArrowLeft} from 'lucide-react';
 import './styles.css';
 import './design-system.css';
 import Workspace from './Workspace';
+import DashboardView from './Dashboard';
 import UserManagement from './UserManagement';
 import ThemeSwitcher from './ThemeSwitcher';
-import {applyTheme,getStoredTheme} from './theme';
+import {applyTheme, getStoredTheme} from './theme';
 import {supabase} from './supabase';
-import {listKitchens,listBoxes,deleteKitchen} from './dataService';
+import {listKitchens, listBoxes, deleteKitchen} from './dataService';
 
-function App(){const [session,setSession]=useState(null),[company,setCompany]=useState(null),[permissions,setPermissions]=useState(new Set()),[loading,setLoading]=useState(true),[error,setError]=useState('');useEffect(()=>{const saved=getStoredTheme();applyTheme(saved.mode,saved.colorTheme);let mounted=true;async function init(){const {data}=await supabase.auth.getSession();if(!mounted)return;setSession(data.session);if(data.session){await loadCompany();await loadPermissions()}setLoading(false)}init();const {data:{subscription}}=supabase.auth.onAuthStateChange(async(_event,next)=>{setSession(next);if(next){await loadCompany();await loadPermissions()}else{setCompany(null);setPermissions(new Set())}});return()=>{mounted=false;subscription.unsubscribe()}},[]);async function loadCompany(){try{const {data:{user}}=await supabase.auth.getUser();if(!user){setCompany(null);return}const {data,error}=await supabase.from('company_members').select('company_id,companies(*)').eq('user_id',user.id).eq('status','active').limit(1).maybeSingle();if(error)throw error;setCompany(data?.companies||false)}catch(e){setError(e.message)}}async function loadPermissions(){const {data,error}=await supabase.rpc('get_my_company_permissions');if(error){setError(error.message);return}setPermissions(new Set((data||[]).map(x=>x.permission_code)))}async function signOut(){await supabase.auth.signOut()}if(loading)return <div className="auth-shell"><div className="auth-card"><h1>Alum KitchenKit</h1><p>Chargement...</p></div></div>;if(!session)return <AuthScreen/>;if(company===false)return <CompanySetup onCreated={loadCompany} userEmail={session.user.email||''}/>;if(!company)return <div className="auth-shell"><div className="auth-card"><h1>Alum KitchenKit</h1><p>{error||'Chargement de votre entreprise...'}</p></div></div>;return <AppShell company={company} permissions={permissions} onSignOut={signOut}/>}
+function App() {
+  const [session, setSession] = useState(null);
+  const [company, setCompany] = useState(null);
+  const [permissions, setPermissions] = useState(new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-function AuthScreen(){const [mode,setMode]=useState('login'),[name,setName]=useState(''),[phone,setPhone]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');async function submit(e){e.preventDefault();setBusy(true);setError('');setMessage('');try{if(mode==='login'){const {error}=await supabase.auth.signInWithPassword({email:email.trim(),password});if(error)throw error}else{if(!name.trim())throw new Error('Le nom complet est requis.');if(password!==confirm)throw new Error('Les mots de passe ne correspondent pas.');if(password.length<8)throw new Error('Le mot de passe doit contenir au moins 8 caractères.');const {data,error}=await supabase.auth.signUp({email:email.trim(),password,options:{data:{full_name:name.trim(),phone:phone.trim()}}});if(error)throw error;setMessage(data.session?'Compte créé.':'Compte créé. Vérifiez votre email puis connectez-vous.');if(data.session)setMode('login')}}catch(e){setError(e.message)}finally{setBusy(false)}}return <div className="auth-shell"><div className="auth-card"><h1>Alum KitchenKit</h1><p>Gestion de fabrication de cuisines aluminium</p>{error&&<div className="error">{error}</div>}{message&&<div className="success">{message}</div>}{mode==='signup'&&<label>Nom complet<input required value={name} onChange={e=>setName(e.target.value)}/></label>}<form onSubmit={submit}><label>Email professionnel<input type="email" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Mot de passe<input type="password" required minLength="8" value={password} onChange={e=>setPassword(e.target.value)}/></label>{mode==='signup'&&<><label>Téléphone<input value={phone} onChange={e=>setPhone(e.target.value)}/></label><label>Confirmer le mot de passe<input type="password" required minLength="8" value={confirm} onChange={e=>setConfirm(e.target.value)}/></label></>}<button className="primary" disabled={busy}>{busy?'...':mode==='login'?'Se connecter':'Créer le compte'}</button></form><button className="link-button" onClick={()=>{setMode(mode==='login'?'signup':'login');setError('');setMessage('')}}>{mode==='login'?'Créer un nouveau compte':'J’ai déjà un compte'}</button></div></div>}
+  useEffect(() => {
+    const saved = getStoredTheme();
+    applyTheme(saved.mode, saved.colorTheme);
+    let mounted = true;
 
-function CompanySetup({onCreated,userEmail}){const [form,setForm]=useState({name:'',phone:'',email:userEmail,address:'',currency:'DZD'}),[busy,setBusy]=useState(false),[error,setError]=useState('');const set=(k,v)=>setForm(f=>({...f,[k]:v}));async function submit(e){e.preventDefault();setBusy(true);setError('');try{const {error}=await supabase.rpc('create_company_for_current_user',{p_name:form.name,p_phone:form.phone||null,p_email:form.email||null,p_address:form.address||null,p_currency:form.currency});if(error)throw error;await onCreated()}catch(e){setError(e.message)}finally{setBusy(false)}}return <div className="auth-shell"><div className="auth-card wide"><h1>Créer votre entreprise</h1>{error&&<div className="error">{error}</div>}<form onSubmit={submit}><label>Nom de l’entreprise *<input required value={form.name} onChange={e=>set('name',e.target.value)}/></label><label>Téléphone<input value={form.phone} onChange={e=>set('phone',e.target.value)}/></label><label>Email de l’entreprise<input type="email" value={form.email} onChange={e=>set('email',e.target.value)}/></label><label>Adresse<input value={form.address} onChange={e=>set('address',e.target.value)}/></label><label>Devise<select value={form.currency} onChange={e=>set('currency',e.target.value)}><option value="DZD">DZD</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label><button className="primary" disabled={busy}>Créer mon espace entreprise</button></form></div></div>}
+    async function init() {
+      const {data} = await supabase.auth.getSession();
+      if (!mounted) return;
+      setSession(data.session);
+      if (data.session) {
+        await loadCompany();
+        await loadPermissions();
+      }
+      setLoading(false);
+    }
 
-function AppShell({company,permissions,onSignOut}){const [page,setPage]=useState('Dashboard');const [selectedKitchen,setSelectedKitchen]=useState(null);function openNew(){setSelectedKitchen(null);setPage('Project')}function openKitchen(id){setSelectedKitchen(id);setPage('Project')}function openProjects(){setPage('Projects')}function backDashboard(){setSelectedKitchen(null);setPage('Dashboard')}return <div className="app simplified-app"><aside><div className="brand"><div className="logo">AK</div><div><strong>Alum KitchenKit</strong><small>{company.name}</small></div></div><nav><button className={page==='Dashboard'?'active':''} onClick={()=>setPage('Dashboard')}><LayoutDashboard size={18}/>Dashboard</button><button className={page==='Projects'?'active':''} onClick={openProjects}><FileText size={18}/>Projets</button></nav><button className="logout" onClick={onSignOut}><LogOut size={17}/>Déconnexion</button></aside><main><header><div><h1>{page==='Dashboard'?'Dashboard':page==='Projects'?'Projets':'Ajouter un projet'}</h1><p>Gestion de projets de fabrication</p></div><ThemeSwitcher/></header>{page==='Dashboard'?<Dashboard company={company} onAdd={openNew} onOpen={openKitchen} onViewAll={openProjects}/>:page==='Projects'?<ProjectsPage company={company} onAdd={openNew} onOpen={openKitchen} onBack={backDashboard}/>:<Workspace initialKitchenId={selectedKitchen} onBack={backDashboard}/>}</main></div>}
+    init();
+    const {data: {subscription}} = supabase.auth.onAuthStateChange(async (_event, next) => {
+      setSession(next);
+      if (next) {
+        await loadCompany();
+        await loadPermissions();
+      } else {
+        setCompany(null);
+        setPermissions(new Set());
+      }
+    });
 
-function Dashboard({company,onAdd,onOpen,onViewAll}){const [projects,setProjects]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[deletingId,setDeletingId]=useState(null);async function load(){setLoading(true);setError('');try{const rows=await listKitchens(company.id);const enriched=await Promise.all(rows.map(async k=>({...k,boxCount:(await listBoxes(k.id)).length})));setProjects(enriched)}catch(e){setError(e.message)}finally{setLoading(false)}}useEffect(()=>{load()},[company.id]);async function removeProject(e,p){e.stopPropagation();if(!window.confirm(`Supprimer le projet « ${p.name||'Projet sans nom'} » ?\n\nCette action supprimera définitivement le projet et toutes ses boîtes. Cette opération est irréversible.`))return;setDeletingId(p.id);setError('');try{await deleteKitchen(p.id);setProjects(prev=>prev.filter(x=>x.id!==p.id))}catch(e){setError(e.message)}finally{setDeletingId(null)}}const visibleProjects=projects.slice(0,4);return <><section className="dashboard-hero"><div><h2>Bonjour</h2><p>Gérez vos projets de cuisines depuis un seul endroit.</p></div><button className="primary project-add" onClick={onAdd}><Plus size={18}/>Ajouter un projet</button></section><section className="cards"><Card title="Entreprise" value={company.name}/><Card title="Projets" value={projects.length}/><Card title="Brouillons" value={projects.filter(p=>p.status==='draft').length}/></section><section className="panel dashboard-projects"><div className="section-head"><div><h3>Projets</h3></div></div>{error&&<div className="error">{error}</div>}{loading?<p>Chargement des projets…</p>:projects.length===0?<div className="dashboard-empty"><FileText size={24}/><p>Aucun projet. Commencez par créer votre premier projet.</p><button className="secondary" onClick={onAdd}>＋ Ajouter un projet</button></div>:<><ProjectList projects={visibleProjects} deletingId={deletingId} onOpen={onOpen} onDelete={removeProject}/><div className="project-more"><button className="secondary project-more-button" onClick={onViewAll}>Voir tous les projets</button></div></>}</section></>}
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
-function ProjectsPage({company,onAdd,onOpen,onBack}){const [projects,setProjects]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[deletingId,setDeletingId]=useState(null),[projectSearch,setProjectSearch]=useState(''),[clientSearch,setClientSearch]=useState(''),[phoneSearch,setPhoneSearch]=useState(''),[dateFrom,setDateFrom]=useState(''),[dateTo,setDateTo]=useState('');async function load(){setLoading(true);setError('');try{const rows=await listKitchens(company.id);const enriched=await Promise.all(rows.map(async k=>({...k,boxCount:(await listBoxes(k.id)).length})));setProjects(enriched)}catch(e){setError(e.message)}finally{setLoading(false)}}useEffect(()=>{load()},[company.id]);async function removeProject(e,p){e.stopPropagation();if(!window.confirm(`Supprimer le projet « ${p.name||'Projet sans nom'} » ?\n\nCette action supprimera définitivement le projet et toutes ses boîtes. Cette opération est irréversible.`))return;setDeletingId(p.id);setError('');try{await deleteKitchen(p.id);setProjects(prev=>prev.filter(x=>x.id!==p.id))}catch(e){setError(e.message)}finally{setDeletingId(null)}}const normalize=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');const normalizedProjectSearch=normalize(projectSearch),normalizedClientSearch=normalize(clientSearch),normalizedPhoneSearch=normalize(phoneSearch);const filteredProjects=projects.filter(p=>{const projectMatch=!normalizedProjectSearch||normalize(p.name).includes(normalizedProjectSearch);const clientMatch=!normalizedClientSearch||normalize(p.customers?.name).includes(normalizedClientSearch);const phoneMatch=!normalizedPhoneSearch||normalize(p.customers?.phone).includes(normalizedPhoneSearch);const created=p.created_at?new Date(p.created_at):null;const fromMatch=!dateFrom||!created||created>=new Date(`${dateFrom}T00:00:00`);const toMatch=!dateTo||!created||created<=new Date(`${dateTo}T23:59:59.999`);return projectMatch&&clientMatch&&phoneMatch&&fromMatch&&toMatch});const hasFilters=Boolean(projectSearch||clientSearch||phoneSearch||dateFrom||dateTo);return <section className="panel dashboard-projects projects-page"><div className="section-head"><div><button className="secondary" onClick={onBack}><ArrowLeft size={16}/>Dashboard</button></div><div className="section-head-actions"><button className="primary" onClick={onAdd}><Plus size={18}/>Ajouter un projet</button></div></div><div className="project-search" style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(180px,1fr))',gap:'10px',alignItems:'end'}}><label style={{display:'grid',gap:'6px',fontSize:'11px',fontWeight:700,color:'#59636f'}}>Nom du projet<input type="text" value={projectSearch} onChange={e=>setProjectSearch(e.target.value)} placeholder="Rechercher par nom du projet" aria-label="Rechercher par nom du projet" autoComplete="off" /></label><label style={{display:'grid',gap:'6px',fontSize:'11px',fontWeight:700,color:'#59636f'}}>Nom du client<input type="text" value={clientSearch} onChange={e=>setClientSearch(e.target.value)} placeholder="Rechercher par nom du client" aria-label="Rechercher par nom du client" autoComplete="off" /></label><label style={{display:'grid',gap:'6px',fontSize:'11px',fontWeight:700,color:'#59636f'}}>Téléphone<input type="text" value={phoneSearch} onChange={e=>setPhoneSearch(e.target.value)} placeholder="Rechercher par téléphone" aria-label="Rechercher par téléphone du client" autoComplete="off" /></label><label style={{display:'grid',gap:'6px',fontSize:'11px',fontWeight:700,color:'#59636f'}}>Date de début<input type="date" value={dateFrom} max={dateTo||undefined} onChange={e=>setDateFrom(e.target.value)} aria-label="Date de début" /></label><label style={{display:'grid',gap:'6px',fontSize:'11px',fontWeight:700,color:'#59636f'}}>Date de fin<input type="date" value={dateTo} min={dateFrom||undefined} onChange={e=>setDateTo(e.target.value)} aria-label="Date de fin" /></label></div>{error&&<div className="error">{error}</div>}{loading?<p>Chargement des projets…</p>:filteredProjects.length===0?<div className="dashboard-empty"><FileText size={24}/><p>{hasFilters?'Aucun projet ne correspond aux critères de recherche.':'Aucun projet.'}</p></div>:<ProjectList projects={filteredProjects} deletingId={deletingId} onOpen={onOpen} onDelete={removeProject}/>}</section>}
+  async function loadCompany() {
+    try {
+      const {data: {user}} = await supabase.auth.getUser();
+      if (!user) {
+        setCompany(null);
+        return;
+      }
+      const {data, error} = await supabase
+        .from('company_members')
+        .select('company_id,companies(*)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      setCompany(data?.companies || false);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
-function ProjectList({projects,deletingId,onOpen,onDelete}){const formatDate=value=>{if(!value)return 'Date inconnue';const date=new Date(value);return Number.isNaN(date.getTime())?'Date inconnue':new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}).format(date)};return <div className="project-list">{projects.map(p=><button className="project-row" key={p.id} onClick={()=>onOpen(p.id)} disabled={deletingId===p.id}><div><strong>{p.name||'Projet sans nom'}</strong><span>{p.customers?.name||'Client non renseigné'} · {p.customers?.phone||'Téléphone non renseigné'} · {p.reference||'Sans référence'} · {formatDate(p.created_at)}</span></div><div className="project-row-actions"><span className={`status-badge ${p.status==='draft'?'draft':'confirmed'}`}>{p.status==='draft'?'Draft':'Enregistré'}</span><span className="danger project-delete" role="button" tabIndex={0} onClick={e=>onDelete(e,p)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')onDelete(e,p)}}>{deletingId===p.id?'Suppression…':'Supprimer'}</span></div></button>)} </div>}
+  async function loadPermissions() {
+    const {data, error} = await supabase.rpc('get_my_company_permissions');
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setPermissions(new Set((data || []).map(x => x.permission_code)));
+  }
 
-function Card({title,value}){return <div className="card"><span>{title}</span><strong>{value}</strong></div>}
+  async function signOut() {
+    await supabase.auth.signOut();
+  }
 
-createRoot(document.getElementById('root')).render(<App/>);
+  if (loading) return <div className="auth-shell"><div className="auth-card"><h1>Alum KitchenKit</h1><p>Chargement...</p></div></div>;
+  if (!session) return <AuthScreen />;
+  if (company === false) return <CompanySetup onCreated={loadCompany} userEmail={session.user.email || ''} />;
+  if (!company) return <div className="auth-shell"><div className="auth-card"><h1>Alum KitchenKit</h1><p>{error || 'Chargement de votre entreprise...'}</p></div></div>;
+
+  return <AppShell company={company} permissions={permissions} onSignOut={signOut} />;
+}
+
+function AuthScreen() {
+  const [mode, setMode] = useState('login');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      if (mode === 'login') {
+        const {error} = await supabase.auth.signInWithPassword({email: email.trim(), password});
+        if (error) throw error;
+      } else {
+        if (!name.trim()) throw new Error('Le nom complet est requis.');
+        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.');
+        if (password.length < 8) throw new Error('Le mot de passe doit contenir au moins 8 caractères.');
+        const {data, error} = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {data: {full_name: name.trim(), phone: phone.trim()}}
+        });
+        if (error) throw error;
+        setMessage(data.session ? 'Compte créé.' : 'Compte créé. Vérifiez votre email puis connectez-vous.');
+        if (data.session) setMode('login');
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="auth-shell"><div className="auth-card">
+    <h1>Alum KitchenKit</h1>
+    <p>Gestion de fabrication de cuisines aluminium</p>
+    {error && <div className="error">{error}</div>}
+    {message && <div className="success">{message}</div>}
+    {mode === 'signup' && <label>Nom complet<input required value={name} onChange={e => setName(e.target.value)} /></label>}
+    <form onSubmit={submit}>
+      <label>Email professionnel<input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></label>
+      <label>Mot de passe<input type="password" required minLength="8" value={password} onChange={e => setPassword(e.target.value)} /></label>
+      {mode === 'signup' && <>
+        <label>Téléphone<input value={phone} onChange={e => setPhone(e.target.value)} /></label>
+        <label>Confirmer le mot de passe<input type="password" required minLength="8" value={confirm} onChange={e => setConfirm(e.target.value)} /></label>
+      </>}
+      <button className="primary" disabled={busy}>{busy ? '...' : mode === 'login' ? 'Se connecter' : 'Créer le compte'}</button>
+    </form>
+    <button className="link-button" onClick={() => {setMode(mode === 'login' ? 'signup' : 'login'); setError(''); setMessage('');}}>
+      {mode === 'login' ? 'Créer un nouveau compte' : 'J’ai déjà un compte'}
+    </button>
+  </div></div>;
+}
+
+function CompanySetup({onCreated, userEmail}) {
+  const [form, setForm] = useState({name: '', phone: '', email: userEmail, address: '', currency: 'DZD'});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const {error} = await supabase.rpc('create_company_for_current_user', {
+        p_name: form.name,
+        p_phone: form.phone || null,
+        p_email: form.email || null,
+        p_address: form.address || null,
+        p_currency: form.currency
+      });
+      if (error) throw error;
+      await onCreated();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="auth-shell"><div className="auth-card wide">
+    <h1>Créer votre entreprise</h1>
+    {error && <div className="error">{error}</div>}
+    <form onSubmit={submit}>
+      <label>Nom de l’entreprise *<input required value={form.name} onChange={e => set('name', e.target.value)} /></label>
+      <label>Téléphone<input value={form.phone} onChange={e => set('phone', e.target.value)} /></label>
+      <label>Email de l’entreprise<input type="email" value={form.email} onChange={e => set('email', e.target.value)} /></label>
+      <label>Adresse<input value={form.address} onChange={e => set('address', e.target.value)} /></label>
+      <label>Devise<select value={form.currency} onChange={e => set('currency', e.target.value)}><option value="DZD">DZD</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label>
+      <button className="primary" disabled={busy}>Créer mon espace entreprise</button>
+    </form>
+  </div></div>;
+}
+
+function AppShell({company, permissions, onSignOut}) {
+  const [page, setPage] = useState('Dashboard');
+  const [selectedKitchen, setSelectedKitchen] = useState(null);
+
+  function openNew() { setSelectedKitchen(null); setPage('Project'); }
+  function openKitchen(id) { setSelectedKitchen(id); setPage('Project'); }
+  function openProjects() { setPage('Projects'); }
+  function backDashboard() { setSelectedKitchen(null); setPage('Dashboard'); }
+
+  return <div className="app simplified-app">
+    <aside>
+      <div className="brand"><div className="logo">AK</div><div><strong>Alum KitchenKit</strong><small>{company.name}</small></div></div>
+      <nav>
+        <button className={page === 'Dashboard' ? 'active' : ''} onClick={() => setPage('Dashboard')}><LayoutDashboard size={18} />Dashboard</button>
+        <button className={page === 'Projects' ? 'active' : ''} onClick={openProjects}><FileText size={18} />Projets</button>
+      </nav>
+      <button className="logout" onClick={onSignOut}><LogOut size={17} />Déconnexion</button>
+    </aside>
+    <main>
+      <header><div><h1>{page === 'Dashboard' ? 'Dashboard' : page === 'Projects' ? 'Projets' : 'Ajouter un projet'}</h1><p>Gestion de projets de fabrication</p></div><ThemeSwitcher /></header>
+      {page === 'Dashboard'
+        ? <DashboardView company={company} onAdd={openNew} onOpen={openKitchen} onViewAll={openProjects} />
+        : page === 'Projects'
+          ? <ProjectsPage company={company} onAdd={openNew} onOpen={openKitchen} onBack={backDashboard} />
+          : <Workspace initialKitchenId={selectedKitchen} onBack={backDashboard} />}
+    </main>
+  </div>;
+}
+
+function ProjectsPage({company, onAdd, onOpen, onBack}) {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [projectSearch, setProjectSearch] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
+  const [phoneSearch, setPhoneSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const rows = await listKitchens(company.id);
+      const enriched = await Promise.all(rows.map(async k => ({...k, boxCount: (await listBoxes(k.id)).length})));
+      setProjects(enriched);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [company.id]);
+
+  async function removeProject(e, p) {
+    e.stopPropagation();
+    if (!window.confirm(`Supprimer le projet « ${p.name || 'Projet sans nom'} » ?\n\nCette action supprimera définitivement le projet et toutes ses boîtes. Cette opération est irréversible.`)) return;
+    setDeletingId(p.id);
+    setError('');
+    try {
+      await deleteKitchen(p.id);
+      setProjects(prev => prev.filter(x => x.id !== p.id));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  const normalize = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+  const normalizedProjectSearch = normalize(projectSearch);
+  const normalizedClientSearch = normalize(clientSearch);
+  const normalizedPhoneSearch = normalize(phoneSearch);
+  const filteredProjects = projects.filter(p => {
+    const projectMatch = !normalizedProjectSearch || normalize(p.name).includes(normalizedProjectSearch);
+    const clientMatch = !normalizedClientSearch || normalize(p.customers?.name).includes(normalizedClientSearch);
+    const phoneMatch = !normalizedPhoneSearch || normalize(p.customers?.phone).includes(normalizedPhoneSearch);
+    const created = p.created_at ? new Date(p.created_at) : null;
+    const fromMatch = !dateFrom || !created || created >= new Date(`${dateFrom}T00:00:00`);
+    const toMatch = !dateTo || !created || created <= new Date(`${dateTo}T23:59:59.999`);
+    return projectMatch && clientMatch && phoneMatch && fromMatch && toMatch;
+  });
+  const hasFilters = Boolean(projectSearch || clientSearch || phoneSearch || dateFrom || dateTo);
+
+  return <section className="panel dashboard-projects projects-page">
+    <div className="section-head">
+      <div><button className="secondary" onClick={onBack}><ArrowLeft size={16} />Dashboard</button></div>
+      <div className="section-head-actions"><button className="primary" onClick={onAdd}><Plus size={18} />Ajouter un projet</button></div>
+    </div>
+    <div className="project-search" style={{display: 'grid', gridTemplateColumns: 'repeat(3,minmax(180px,1fr))', gap: '10px', alignItems: 'end'}}>
+      <label style={{display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 700}}>Nom du projet<input type="text" value={projectSearch} onChange={e => setProjectSearch(e.target.value)} placeholder="Rechercher par nom du projet" autoComplete="off" /></label>
+      <label style={{display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 700}}>Nom du client<input type="text" value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Rechercher par nom du client" autoComplete="off" /></label>
+      <label style={{display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 700}}>Téléphone<input type="text" value={phoneSearch} onChange={e => setPhoneSearch(e.target.value)} placeholder="Rechercher par téléphone" autoComplete="off" /></label>
+      <label style={{display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 700}}>Date de début<input type="date" value={dateFrom} max={dateTo || undefined} onChange={e => setDateFrom(e.target.value)} /></label>
+      <label style={{display: 'grid', gap: '6px', fontSize: '11px', fontWeight: 700}}>Date de fin<input type="date" value={dateTo} min={dateFrom || undefined} onChange={e => setDateTo(e.target.value)} /></label>
+    </div>
+    {error && <div className="error">{error}</div>}
+    {loading ? <p>Chargement des projets…</p> : filteredProjects.length === 0
+      ? <div className="dashboard-empty"><FileText size={24} /><p>{hasFilters ? 'Aucun projet ne correspond aux critères de recherche.' : 'Aucun projet.'}</p></div>
+      : <ProjectList projects={filteredProjects} deletingId={deletingId} onOpen={onOpen} onDelete={removeProject} />}
+  </section>;
+}
+
+function ProjectList({projects, deletingId, onOpen, onDelete}) {
+  const formatDate = value => {
+    if (!value) return 'Date inconnue';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Date inconnue' : new Intl.DateTimeFormat('fr-FR', {day: '2-digit', month: '2-digit', year: 'numeric'}).format(date);
+  };
+
+  return <div className="project-list">
+    {projects.map(p => <button className="project-row" key={p.id} onClick={() => onOpen(p.id)} disabled={deletingId === p.id}>
+      <div><strong>{p.name || 'Projet sans nom'}</strong><span>{p.customers?.name || 'Client non renseigné'} · {p.customers?.phone || 'Téléphone non renseigné'} · {p.reference || 'Sans référence'} · {formatDate(p.created_at)}</span></div>
+      <div className="project-row-actions">
+        <span className={`status-badge ${p.status === 'draft' ? 'draft' : 'confirmed'}`}>{p.status === 'draft' ? 'Draft' : 'Enregistré'}</span>
+        <span className="danger project-delete" role="button" tabIndex={0} onClick={e => onDelete(e, p)} onKeyDown={e => {if (e.key === 'Enter' || e.key === ' ') onDelete(e, p)}}>{deletingId === p.id ? 'Suppression…' : 'Supprimer'}</span>
+      </div>
+    </button>)}
+  </div>;
+}
+
+createRoot(document.getElementById('root')).render(<App />);
