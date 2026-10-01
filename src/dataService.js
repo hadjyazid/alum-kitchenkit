@@ -21,7 +21,7 @@ export async function getKitchen(kitchenId){
   if(error) throw error; return data;
 }
 export async function listKitchens(companyId){
-  const {data,error}=await supabase.from('kitchens').select('*,customers(name,phone)').eq('company_id',companyId).order('updated_at',{ascending:false});
+  const {data,error}=await supabase.from('kitchens').select('*,customers(name,phone,address)').eq('company_id',companyId).order('updated_at',{ascending:false});
   if(error) throw error; return data;
 }
 export async function updateKitchen(kitchenId,input){
